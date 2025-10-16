@@ -1,0 +1,5 @@
+# requirements.txt
+Flask==2.3.3
+pytest==7.4.2
+requests==2.31.0
+gunicorn==21.2.0
