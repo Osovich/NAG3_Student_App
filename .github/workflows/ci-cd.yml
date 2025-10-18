@@ -1,0 +1,118 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: gcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Run security audit
+      run: npm audit --audit-level moderate
+      
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        
+    - name: Configure Docker for GCR
+      run: gcloud auth configure-docker
+      
+    - name: Build Docker image
+      run: |
+        docker build -t $REGISTRY/${{ secrets.GCP_PROJECT_ID }}/$IMAGE_NAME:${{ github.sha }} .
+        docker build -t $REGISTRY/${{ secrets.GCP_PROJECT_ID }}/$IMAGE_NAME:latest .
+        
+    - name: Push to GCR
+      run: |
+        docker push $REGISTRY/${{ secrets.GCP_PROJECT_ID }}/$IMAGE_NAME:${{ github.sha }}
+        docker push $REGISTRY/${{ secrets.GCP_PROJECT_ID }}/$IMAGE_NAME:latest
+
+  deploy-test:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        
+    - name: Deploy to test environment
+      run: |
+        gcloud container clusters get-credentials test-cluster --zone=us-central1-a
+        kubectl set image deployment/nag3-student-app nag3-student-app=$REGISTRY/${{ secrets.GCP_PROJECT_ID }}/$IMAGE_NAME:${{ github.sha }}
+        kubectl rollout status deployment/nag3-student-app
+
+  deploy-production:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Google Cloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        
+    - name: Deploy to production
+      run: |
+        gcloud container clusters get-credentials prod-cluster --zone=us-central1-a
+        kubectl set image deployment/nag3-student-app nag3-student-app=$REGISTRY/${{ secrets.GCP_PROJECT_ID }}/$IMAGE_NAME:${{ github.sha }}
+        kubectl rollout status deployment/nag3-student-app
+        
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
