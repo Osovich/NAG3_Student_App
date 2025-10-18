@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: nag3-student-app
-  labels:
-    name: nag3-student-app
-    environment: production
