@@ -1,22 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend-test
-  namespace: test
-  labels:
-    app: backend
-    environment: test
+  name: student-app-backend
+  namespace: student-app
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: backend
-      environment: test
+      app: student-app-backend
   template:
     metadata:
       labels:
-        app: backend
-        environment: test
+        app: student-app-backend
     spec:
       containers:
       - name: backend
@@ -25,13 +20,20 @@ spec:
         - containerPort: 5000
         env:
         - name: NODE_ENV
-          value: "test"
+          value: "production"
         - name: MONGODB_URI
-          value: "mongodb://mongo-test:27017/student-app-test"
+          value: "mongodb://mongodb-service:27017/student-app"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: jwt-secret
+        - name: CORS_ORIGIN
+          value: "https://yourdomain.com"
         resources:
           requests:
             memory: "256Mi"
-            cpu: "200m"
+            cpu: "250m"
           limits:
             memory: "512Mi"
             cpu: "500m"
@@ -51,12 +53,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: backend-test-service
-  namespace: test
+  name: student-app-backend-service
+  namespace: student-app
 spec:
   selector:
-    app: backend
-    environment: test
+    app: student-app-backend
   ports:
   - port: 5000
     targetPort: 5000

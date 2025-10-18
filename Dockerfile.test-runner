@@ -1,0 +1,19 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Copy test files
+COPY test-runner/package*.json ./
+RUN npm ci
+
+# Copy test scripts
+COPY test-runner/ ./
+
+# Make test script executable
+RUN chmod +x run-tests.sh
+
+# Run integration tests
+CMD ["./run-tests.sh"]
