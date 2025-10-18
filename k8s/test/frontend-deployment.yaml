@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-test
+  namespace: test
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend-test
+  template:
+    metadata:
+      labels:
+        app: frontend-test
+    spec:
+      containers:
+      - name: frontend
+        image: gcr.io/your-gcp-project-id/student-app-frontend:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "test"
+        - name: REACT_APP_API_URL
+          value: "http://backend-test-service:5000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-test-service
+  namespace: test
+spec:
+  selector:
+    app: frontend-test
+  ports:
+  - port: 80
+    targetPort: 3000
+  type: LoadBalancer

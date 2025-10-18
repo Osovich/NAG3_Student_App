@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: student-app-frontend
-  namespace: student-app
+  name: frontend-prod
+  namespace: production
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
-      app: student-app-frontend
+      app: frontend-prod
   template:
     metadata:
       labels:
-        app: student-app-frontend
+        app: frontend-prod
     spec:
       containers:
       - name: frontend
@@ -25,11 +25,11 @@ spec:
           value: "https://api.yourdomain.com"
         resources:
           requests:
-            memory: "128Mi"
-            cpu: "100m"
+            memory: "512Mi"
+            cpu: "500m"
           limits:
-            memory: "256Mi"
-            cpu: "200m"
+            memory: "1Gi"
+            cpu: "1000m"
         livenessProbe:
           httpGet:
             path: /
@@ -46,12 +46,33 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: student-app-frontend-service
-  namespace: student-app
+  name: frontend-prod-service
+  namespace: production
 spec:
   selector:
-    app: student-app-frontend
+    app: frontend-prod
   ports:
-  - port: 3000
+  - port: 80
     targetPort: 3000
-  type: ClusterIP
+  type: LoadBalancer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-ingress
+  namespace: production
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "your-static-ip"
+spec:
+  rules:
+  - host: yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-prod-service
+            port:
+              number: 80

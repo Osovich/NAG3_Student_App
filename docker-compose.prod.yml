@@ -1,6 +1,6 @@
 version: '3.8'
 services:
-  frontend:
+  frontend-prod:
     image: gcr.io/your-gcp-project-id/student-app-frontend:latest
     ports:
       - "80:3000"
@@ -10,49 +10,32 @@ services:
     restart: unless-stopped
     networks:
       - production-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  backend:
+  backend-prod:
     image: gcr.io/your-gcp-project-id/student-app-backend:latest
     ports:
       - "443:5000"
     environment:
       - NODE_ENV=production
-      - MONGODB_URI=mongodb://mongo:27017/student-app
-      - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGIN=https://yourdomain.com
+      - MONGODB_URI=mongodb://mongo-prod:27017/student-app-prod
+      - JWT_SECRET=your-production-jwt-secret
     depends_on:
-      - mongo
+      - mongo-prod
     restart: unless-stopped
     networks:
       - production-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  mongo:
-    image: mongo:6.0
+  mongo-prod:
+    image: mongo:latest
     ports:
       - "27017:27017"
     environment:
-      - MONGO_INITDB_DATABASE=student-app
+      - MONGO_INITDB_DATABASE=student-app-prod
     volumes:
       - mongo-data:/data/db
-      - ./mongo-init:/docker-entrypoint-initdb.d
     restart: unless-stopped
     networks:
       - production-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   nginx:
     image: nginx:alpine
@@ -63,30 +46,14 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./ssl:/etc/nginx/ssl
     depends_on:
-      - frontend
-      - backend
+      - frontend-prod
+      - backend-prod
     restart: unless-stopped
     networks:
       - production-network
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-    networks:
-      - production-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
 volumes:
   mongo-data:
-  redis-data:
 
 networks:
   production-network:
